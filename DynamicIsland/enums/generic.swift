@@ -81,6 +81,8 @@ public enum NotchViews {
     case clipboard
     case terminal
     case extensionExperience
+    /// The AI Usage island's expanded view (full-bleed, no tab header).
+    case aiUsage
 }
 
 enum NotesLayoutState: Equatable {

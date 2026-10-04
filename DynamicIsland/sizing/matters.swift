@@ -121,6 +121,11 @@ func enabledStandardTabCount() -> Int {
         count += 1
     }
 
+    // AI Usage tab
+    if Defaults[.enableAIUsageIsland] {
+        count += 1
+    }
+
     // Notes / Clipboard tab
     if Defaults[.enableNotes] || (Defaults[.enableClipboardManager] && Defaults[.clipboardDisplayMode] == .separateTab) {
         count += 1

@@ -25,4 +25,14 @@ class AtollUpdaterDelegate: NSObject, SPUUpdaterDelegate {
     func feedURLString(for updater: SPUUpdater) -> String? {
         return Defaults[.updateChannel].feedURL.absoluteString
     }
+
+    /// This build is a fork (AI Usage island). Upstream releases would replace it, so
+    /// update checks are refused; rebuild from the fork to update.
+    func updater(_ updater: SPUUpdater, mayPerform updateCheck: SPUUpdateCheck) throws {
+        throw NSError(
+            domain: "com.ebullioscopic.Atoll.fork",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Updates are disabled in this fork of Atoll. Rebuild it from the fork's source to update."]
+        )
+    }
 }

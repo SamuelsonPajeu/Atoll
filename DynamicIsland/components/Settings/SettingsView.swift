@@ -58,6 +58,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     case hudAndOSD
     case battery
     case stats
+    case aiUsage
     case clipboard
     case screenAssistant
     case colorPicker
@@ -79,7 +80,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .timer, .calendar, .notes:                                      return .productivity
         case .clipboard, .screenAssistant, .colorPicker, .shelf,
              .downloads, .shortcuts:                                         return .utilities
-        case .stats, .terminal:                                              return .developer
+        case .stats, .aiUsage, .terminal:                                    return .developer
         case .extensions:                                                    return .integrations
         case .about:                                                         return .info
         }
@@ -99,6 +100,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .hudAndOSD: return String(localized: "Controls")
         case .battery: return String(localized: "Battery")
         case .stats: return String(localized: "Stats")
+        case .aiUsage: return String(localized: "AI Usage")
         case .clipboard: return String(localized: "Clipboard")
         case .screenAssistant: return String(localized: "Screen Assistant")
         case .colorPicker: return String(localized: "Color Picker")
@@ -125,6 +127,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .hudAndOSD: return "dial.medium.fill"
         case .battery: return "battery.100.bolt"
         case .stats: return "chart.xyaxis.line"
+        case .aiUsage: return "gauge.with.dots.needle.67percent"
         case .clipboard: return "clipboard"
         case .screenAssistant: return "brain.head.profile"
         case .colorPicker: return "eyedropper"
@@ -151,6 +154,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
         case .hudAndOSD: return .indigo
         case .battery: return Color(red: 0.202, green: 0.783, blue: 0.348, opacity: 1.000)
         case .stats: return .teal
+        case .aiUsage: return Color(red: 0xD9 / 255, green: 0x77 / 255, blue: 0x57 / 255)
         case .clipboard: return .mint
         case .screenAssistant: return .pink
         case .colorPicker: return .accentColor
@@ -433,6 +437,12 @@ private enum SettingsSearchIndex {
         SettingsSearchEntry(tab: .timer, title: "Accent colour", keywords: ["accent", "timer"], highlightID: SettingsTab.timer.highlightID(for: "Accent colour")),
 
         // Stats
+        // AI Usage
+        SettingsSearchEntry(tab: .aiUsage, title: "AI Usage", keywords: ["agent usage", "ai usage", "agents", "claude", "codex", "claude code", "claude desktop", "limit", "quota", "5-hour", "weekly", "plan"], highlightID: nil),
+        SettingsSearchEntry(tab: .aiUsage, title: "Show AI Usage in the notch", keywords: ["agent usage", "ai usage", "enable", "disable", "island", "live activity"], highlightID: nil),
+        SettingsSearchEntry(tab: .aiUsage, title: "Warning threshold", keywords: ["agent usage", "ai usage", "warning", "threshold", "yellow", "alert"], highlightID: nil),
+        SettingsSearchEntry(tab: .aiUsage, title: "Alerts", keywords: ["agent usage", "ai usage", "activity", "limit reached", "limit reset", "notification"], highlightID: nil),
+        SettingsSearchEntry(tab: .aiUsage, title: "Claude Code permission requests", keywords: ["agent usage", "ai usage", "permission", "allow", "deny", "hooks"], highlightID: nil),
         SettingsSearchEntry(tab: .stats, title: "Enable system stats monitoring", keywords: ["stats", "monitoring"], highlightID: SettingsTab.stats.highlightID(for: "Enable system stats monitoring")),
         SettingsSearchEntry(tab: .stats, title: "Enable LLM Usage Monitor", keywords: ["llm", "usage", "ai", "monitor"], highlightID: SettingsTab.stats.highlightID(for: "Enable LLM Usage Monitor")),
         SettingsSearchEntry(tab: .stats, title: "Claude Provider", keywords: ["llm", "claude", "provider", "toggle"], highlightID: SettingsTab.stats.highlightID(for: "Claude Provider")),
@@ -819,6 +829,7 @@ struct SettingsView: View {
             .shortcuts,
             // Developer
             .stats,
+            .aiUsage,
             .terminal,
             // Integrations
             .extensions,
@@ -1069,6 +1080,10 @@ struct SettingsView: View {
         case .stats:
             SettingsForm(tab: .stats) {
                 StatsSettings()
+            }
+        case .aiUsage:
+            SettingsForm(tab: .aiUsage) {
+                AIUsageIslandSettingsView()
             }
         case .clipboard:
             SettingsForm(tab: .clipboard) {

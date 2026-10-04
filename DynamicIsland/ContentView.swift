@@ -64,6 +64,7 @@ struct ContentView: View {
     @ObservedObject var localSendService = LocalSendService.shared
     @State private var downloadManager = DownloadManager.shared
     @ObservedObject var shelfState = ShelfStateViewModel.shared
+    @ObservedObject var aiUsage = AIUsageIslandManager.shared
     
     @Default(.enableStatsFeature) var enableStatsFeature
     @Default(.showCpuGraph) var showCpuGraph
@@ -117,6 +118,10 @@ struct ContentView: View {
                effectiveClosedNotchHeight: vm.effectiveClosedNotchHeight
            ) {
             return connectivitySize
+        }
+
+        if isAIUsageSurfaceVisible {
+            return aiUsageSurfaceSize
         }
         
         // When inline sneak peek is active in closed notch, use the wider inline width
@@ -185,6 +190,11 @@ struct ContentView: View {
             }
         }
         
+        if coordinator.currentView == .aiUsage {
+            let waiting = aiUsage.state?.focus.pendingPermission != nil
+            return CGSize(width: baseSize.width, height: max(baseSize.height, AIUsageIslandGeometry.openNotchHeight(notchHeight: vm.effectiveClosedNotchHeight, waiting: waiting)))
+        }
+
         if coordinator.currentView == .timer {
             return CGSize(width: baseSize.width, height: 250) // Extra height for timer presets
         }
@@ -449,6 +459,64 @@ struct ContentView: View {
             && !isConnectivityHUDVisible
     }
 
+    // MARK: AI Usage island
+
+    private var aiUsageGeometry: AIUsageIslandGeometry {
+        AIUsageIslandGeometry(notch: CGSize(width: vm.closedNotchSize.width, height: vm.effectiveClosedNotchHeight))
+    }
+
+    /// The AI Usage island owns the closed notch: always when something needs attention
+    /// (alert, permission, limit, warning, reset); otherwise unless music, a timer, a
+    /// recording or a download is showing. System HUDs keep their priority.
+    private var isAIUsageClosedVisible: Bool {
+        guard vm.notchState == .closed,
+              aiUsage.presentsCompact,
+              !vm.hideOnClosed,
+              !lockScreenManager.isLocked,
+              !isConnectivityHUDVisible,
+              !coordinator.firstLaunch else { return false }
+        if isSneakPeekVisibleOnCurrentScreen && Defaults[.inlineHUD] { return false }
+        if capsLockManager.isCapsLockActive && Defaults[.enableCapsLockIndicator] { return false }
+        if currentScreenExpansionType == .battery && isBatteryHUDVisibleOnCurrentScreen
+            && Defaults[.showPowerStatusNotifications] && batteryModel.activeTemporaryHUDKind != nil { return false }
+        if aiUsage.isUrgent { return true }
+        if isCurrentScreenExpansionVisible { return false }
+        return !aiUsageYieldsToOtherLiveActivity
+    }
+
+    private var aiUsageYieldsToOtherLiveActivity: Bool {
+        let hasMusicMetadata = !musicManager.songTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !musicManager.artistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasActiveMusicSnapshot = musicManager.isPlaying || (!musicManager.isPlayerIdle && hasMusicMetadata)
+        if closedMusicPairingEligible(hasActiveMusicSnapshot: hasActiveMusicSnapshot) { return true }
+        if timerManager.isTimerActive && coordinator.timerLiveActivityEnabled { return true }
+        if recordingManager.isRecording && Defaults[.enableScreenRecordingDetection] && Defaults[.showRecordingIndicator] { return true }
+        if downloadManager.isDownloading && Defaults[.enableDownloadListener] { return true }
+        return false
+    }
+
+    /// The closed notch draws the island (compact row or bloom) with its own shape.
+    private var isAIUsageSurfaceVisible: Bool { isAIUsageClosedVisible }
+
+    private var aiUsagePresentation: AIUsageIslandPresentation {
+        aiUsage.bloom == nil ? .compact : .bloom
+    }
+
+    /// A yes/no permission bloom (the taller one with Deny / Allow) is showing.
+    private var aiUsageIsWaiting: Bool {
+        aiUsage.bloom?.kind == .permission && aiUsage.state?.focus.pendingPermission?.needsDecision == true
+    }
+
+    /// While the permission bloom is up, hovering must not open the notch so Deny / Allow
+    /// stay reachable (like the connectivity HUD); a click opens the AI Usage tab instead.
+    private var isAIUsagePermissionBloomVisible: Bool {
+        isAIUsageClosedVisible && aiUsageIsWaiting
+    }
+
+    private var aiUsageSurfaceSize: CGSize {
+        aiUsageGeometry.surface(aiUsagePresentation, waiting: aiUsageIsWaiting)
+    }
+
     private var isConnectivityHUDVisible: Bool {
         NetworkConnectivityHUDMetrics.isPresented(
             state: networkConnectivityManager.hudState,
@@ -623,6 +691,13 @@ struct ContentView: View {
     /// Resolves the clip/content shape per-screen: pill on non-notch screens
     /// when dynamic island mode is active, standard notch shape otherwise.
     private var resolvedClipShape: AnyShape {
+        if isAIUsageSurfaceVisible {
+            let radius = aiUsageGeometry.shape(aiUsagePresentation, waiting: aiUsageIsWaiting).radius
+            if isDynamicIslandMode {
+                return AnyShape(DynamicIslandPillShape(cornerRadius: radius))
+            }
+            return AnyShape(NotchShape(topCornerRadius: AIUsageIslandGeometry.ear, bottomCornerRadius: radius))
+        }
         if isConnectivityHUDVisible {
             if isDynamicIslandMode {
                 let radius: CGFloat = networkConnectivityManager.hudState == .noConnection ? 40 : 24
@@ -658,8 +733,8 @@ struct ContentView: View {
             // Connectivity HUD metrics already describe the complete surface.
             // Applying the regular closed-notch inset here makes that surface
             // wider than both the root view and its NSWindow, clipping both sides.
-            .padding(.horizontal, isConnectivityHUDVisible ? 0 : notchHorizontalPadding)
-            .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
+            .padding(.horizontal, isConnectivityHUDVisible || isAIUsageSurfaceVisible ? 0 : notchHorizontalPadding)
+            .padding([.horizontal, .bottom], vm.notchState == .open && !isAIUsageSurfaceVisible ? 12 : 0)
             .background(.black)
             .clipShape(resolvedClipShape)
             // Keep the anti-gap fill outside the clipped notch. The window sits
@@ -675,10 +750,11 @@ struct ContentView: View {
             }
             .compositingGroup()
             .shadow(
-                color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow])
-                    ? .black.opacity(0.6)
-                    : .clear,
-                radius: Defaults[.cornerRadiusScaling] ? 10 : 5
+                color: isAIUsageSurfaceVisible
+                    ? (aiUsagePresentation == .compact ? .clear : .black.opacity(0.45))
+                    : (((vm.notchState == .open || isHovering) && Defaults[.enableShadow]) ? .black.opacity(0.6) : .clear),
+                radius: isAIUsageSurfaceVisible ? 20 : (Defaults[.cornerRadiusScaling] ? 10 : 5),
+                y: isAIUsageSurfaceVisible ? 18 : 0
             )
             // Extra horizontal inset for Dynamic Island mode so the shadow
             // is not clipped by the outer frame constraint
@@ -1106,7 +1182,9 @@ struct ContentView: View {
                           && coordinator.sneakPeek.value < 0
                           && AirPodsListeningMode.fromHUDSymbol(coordinator.sneakPeek.icon) != nil
 
-                      if currentScreenExpansionType == .battery
+                      if isAIUsageClosedVisible, let aiState = aiUsage.state {
+                          AIUsageClosedIslandView(state: aiState, bloom: aiUsage.bloom, geometry: aiUsageGeometry) { aiUsage.answer($0) }
+                      } else if currentScreenExpansionType == .battery
                             && isBatteryHUDVisibleOnCurrentScreen
                             && vm.notchState == .closed
                             && Defaults[.showPowerStatusNotifications]
@@ -1278,7 +1356,7 @@ struct ContentView: View {
               // its middle transparent lane is what keeps both wings visible.
               // Menu-bar clearance would shift that lane underneath the camera
               // housing and clip one of the two content areas.
-              .offset(x: isConnectivityHUDVisible ? 0 : menuBarClearanceOffset)
+              .offset(x: isConnectivityHUDVisible || isAIUsageSurfaceVisible ? 0 : menuBarClearanceOffset)
               .animation(.smooth(duration: 0.25), value: menuBarClearanceOffset)
               .zIndex(2)
               
@@ -1296,6 +1374,8 @@ struct ContentView: View {
                                   NotchStatsView()
                               case .llmUsage:
                                   NotchLLMUsageView()
+                              case .aiUsage:
+                                  AIUsageTabView(state: aiUsage.state, selectedAgent: $aiUsage.selectedAgent) { aiUsage.answer($0) }
                               case .colorPicker:
                                   NotchColorPickerView()
                             case .notes:
@@ -2093,6 +2173,10 @@ struct ContentView: View {
 
     // MARK: - Private Methods
     private func openNotch() {
+        if isAIUsagePermissionBloomVisible {
+            aiUsage.prepareExpanded()
+            coordinator.currentView = .aiUsage
+        }
         vm.open()
     }
 
@@ -2210,6 +2294,7 @@ struct ContentView: View {
     private func startHoverClickMonitor() {
         guard Defaults[.openNotchOnHover] else { return }
         guard !isConnectivityHUDVisible else { return }
+        guard !isAIUsagePermissionBloomVisible else { return }
         guard !recordingLiveActivityVisibleOnClosedNotch else { return }
         guard hoverClickMonitor == nil else { return }
 
@@ -2336,6 +2421,7 @@ struct ContentView: View {
             guard vm.notchState == .closed,
                 !isSneakPeekVisibleOnCurrentScreen,
                 !isConnectivityHUDVisible,
+                !isAIUsagePermissionBloomVisible,
                 !recordingLiveActivityVisibleOnClosedNotch,
                 (Defaults[.openNotchOnHover] || shouldFocusTimerTab) else { return }
 
@@ -2350,6 +2436,7 @@ struct ContentView: View {
                           !self.recordingLiveActivityVisibleOnClosedNotch,
                           !self.isSneakPeekVisibleOnCurrentScreen,
                           !self.isConnectivityHUDVisible,
+                          !self.isAIUsagePermissionBloomVisible,
                           !self.coordinator.isHoverOpenSuppressed else { return }
 
                     if shouldFocusTimerTab {
@@ -2415,12 +2502,13 @@ struct ContentView: View {
             closedNotchSize: vm.closedNotchSize,
             effectiveClosedNotchHeight: vm.effectiveClosedNotchHeight
         )
-        let height = max(closedHeight, recordingSize?.height ?? 0) + 6
+        let aiUsageSize = isAIUsageClosedVisible ? aiUsageSurfaceSize : .zero
+        let height = max(closedHeight, recordingSize?.height ?? 0, aiUsageSize.height) + 6
             + PinnedLyricsView.reservedHeight(isEligible: pinnedLyricsVisible,
                 availability: musicManager.lyricsAvailability, context: pinnedLyricContext)
-        let width = max(closedWidth, recordingSize?.width ?? 0) + 24
+        let width = max(closedWidth, recordingSize?.width ?? 0, aiUsageSize.width) + 24
         // Same shift the content is drawn with, so the hit area stays under it.
-        let minX = screen.frame.midX - width / 2 + menuBarClearanceOffset
+        let minX = screen.frame.midX - width / 2 + (isAIUsageClosedVisible ? 0 : menuBarClearanceOffset)
         let minY = screen.frame.maxY - height
 
         return location.x >= minX && location.x <= minX + width

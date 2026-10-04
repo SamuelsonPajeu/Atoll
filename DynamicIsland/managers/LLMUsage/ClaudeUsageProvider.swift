@@ -33,7 +33,7 @@ struct ClaudeUsageProvider: UsageProvider {
     /// (not a credential, no token). Prefers `organizationRateLimitTier` (distinguishes Max 5x / 20x),
     /// falling back to `organizationType`. Returns nil if the file is missing or malformed, so the
     /// badge simply does not render — this is best-effort and never fails the snapshot.
-    private static func readPlanLabel() -> String? {
+    static func readPlanLabel() -> String? {
         let url = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude.json")
         guard let data = try? Data(contentsOf: url),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

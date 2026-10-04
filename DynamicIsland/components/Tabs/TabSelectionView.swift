@@ -56,6 +56,7 @@ struct TabSelectionView: View {
     @Default(.enableThirdPartyExtensions) private var enableThirdPartyExtensions
     @Default(.enableExtensionNotchExperiences) private var enableExtensionNotchExperiences
     @Default(.enableExtensionNotchTabs) private var enableExtensionNotchTabs
+    @Default(.enableAIUsageIsland) private var enableAIUsageIsland
     @Default(.showCalendar) private var showCalendar
     @Default(.showMirror) private var showMirror
     @Default(.showStandardMediaControls) private var showStandardMediaControls
@@ -80,6 +81,11 @@ struct TabSelectionView: View {
         // Stats tab only shown when stats feature is enabled
         if Defaults[.enableStatsFeature] {
             tabsArray.append(TabModel(label: "Stats", icon: "chart.xyaxis.line", view: .stats))
+        }
+
+        // AI Usage tab (5-hour / weekly limits, activity, permission requests)
+        if enableAIUsageIsland {
+            tabsArray.append(TabModel(label: "AI Usage", icon: "gauge.with.dots.needle.67percent", view: .aiUsage))
         }
 
         // Usage tab only shown when LLM usage feature is enabled

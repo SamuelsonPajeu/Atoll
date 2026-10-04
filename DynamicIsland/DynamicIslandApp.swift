@@ -565,7 +565,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         var baseSize = Defaults[.enableMinimalisticUI] ? minimalisticOpenNotchSize(isDynamicIslandMode: shouldUseDynamicIslandMode(for: vm.screen)) : openNotchSize
         
         // Use a consistent height for different view types
-        if coordinator.currentView == .timer {
+        if coordinator.currentView == .aiUsage {
+            // Always room for the permission banner so it can appear without a resize.
+            baseSize.height = max(baseSize.height, AIUsageIslandGeometry.openNotchHeight(notchHeight: vm.effectiveClosedNotchHeight, waiting: true))
+        } else if coordinator.currentView == .timer {
             baseSize.height = 250 // Extra space for timer presets
         } else if coordinator.currentView == .notes {
             let preferredHeight = coordinator.notesLayoutState.preferredHeight
@@ -706,6 +709,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         LockScreenLiveActivityWindowManager.shared.configure(viewModel: vm)
         LockScreenManager.shared.configure(viewModel: vm)
+        AIUsageIslandManager.shared.start()
         extensionXPCServiceHost.start()
         extensionRPCServer.start()
         

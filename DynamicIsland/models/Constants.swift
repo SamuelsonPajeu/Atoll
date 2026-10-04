@@ -1287,6 +1287,21 @@ extension Defaults.Keys {
     static let enableAntigravityProvider = Key<Bool>("enableAntigravityProvider", default: true)
     static let enableNewAPIProvider = Key<Bool>("enableNewAPIProvider", default: false)
     static let newAPIAccounts = Key<[NewAPIAccount]>("newAPIAccounts", default: [])
+
+    // MARK: AI Usage Island
+    static let enableAIUsageIsland = Key<Bool>("enableAIUsageIsland", default: true)
+    static let aiUsageMonitorClaudeCode = Key<Bool>("aiUsageMonitorClaudeCode", default: true)
+    static let aiUsageMonitorClaudeDesktop = Key<Bool>("aiUsageMonitorClaudeDesktop", default: true)
+    static let aiUsageMonitorCodex = Key<Bool>("aiUsageMonitorCodex", default: true)
+    static let aiUsageWarnAt = Key<Int>("aiUsageWarnAt", default: 80)
+    static let aiUsageRefreshInterval = Key<Int>("aiUsageRefreshInterval", default: 30)
+    static let aiUsageAlertActivity = Key<Bool>("aiUsageAlertActivity", default: true)
+    static let aiUsageAlertPermission = Key<Bool>("aiUsageAlertPermission", default: true)
+    static let aiUsageAlertWarning = Key<Bool>("aiUsageAlertWarning", default: true)
+    static let aiUsageAlertLimit = Key<Bool>("aiUsageAlertLimit", default: true)
+    static let aiUsageAlertReset = Key<Bool>("aiUsageAlertReset", default: true)
+    /// Agent shown in the closed notch and selected in the AI Usage tab.
+    static let aiUsageSelectedAgent = Key<AIUsageAgent>("aiUsageSelectedAgent", default: .claude)
     static let autoStartStatsMonitoring = Key<Bool>("autoStartStatsMonitoring", default: true)
     static let statsStopWhenNotchCloses = Key<Bool>("statsStopWhenNotchCloses", default: true)
     static let statsUpdateInterval = Key<Double>("statsUpdateInterval", default: 1.0)
