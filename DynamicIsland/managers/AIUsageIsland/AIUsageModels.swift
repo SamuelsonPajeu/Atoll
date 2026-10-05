@@ -88,11 +88,13 @@ struct AIUsageWindow: Equatable, Sendable {
     var displayPercent: Int { Int(min(max(usedPercent, 0), 100).rounded()) }
 
     /// Once the reset time passed the window is fresh: report 0% until the provider says
-    /// otherwise, and move the reset forward by the window length.
-    func rolledForward(now: Date) -> AIUsageWindow {
+    /// otherwise. A fixed-schedule window (weekly) moves its reset forward by the window
+    /// length; one that `restartsOnUse` (5-hour) has no reset time until the next message
+    /// opens a new window.
+    func rolledForward(now: Date, restartsOnUse: Bool = false) -> AIUsageWindow {
         guard let resetsAt, resetsAt <= now else { return self }
         var next = AIUsageWindow(usedPercent: 0, resetsAt: nil, duration: duration)
-        if let duration, duration > 0 {
+        if !restartsOnUse, let duration, duration > 0 {
             var candidate = resetsAt
             while candidate <= now { candidate = candidate.addingTimeInterval(duration) }
             next.resetsAt = candidate

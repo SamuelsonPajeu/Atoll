@@ -72,11 +72,10 @@ final class AIUsageStatusEngine {
         var wasWorking = false
         var idleSince: Date?
         var permissionID: String?
-        var resetUntil: Date?
+        /// A 5-hour window ended; the island shows "Ready" until a new one starts.
+        var showsReset = false
     }
 
-    /// How long the compact island keeps the green "Ready" state after a reset.
-    var resetDisplayDuration: TimeInterval = 10 * 60
     /// An agent must have been idle this long before "is working" alerts again.
     var activityDebounce: TimeInterval = 60
 
@@ -137,7 +136,7 @@ final class AIUsageStatusEngine {
         if agent.pendingPermission != nil { return .waiting }
         if agent.isAtLimit { return .limit }
         if agent.isWorking { return .active }
-        if let until = memory[agent.agent]?.resetUntil, until > now { return .reset }
+        if memory[agent.agent]?.showsReset == true { return .reset }
         if agent.primaryPercent >= Double(settings.warnAt) { return .warning }
         return .idle
     }
@@ -160,7 +159,7 @@ final class AIUsageStatusEngine {
         // A new 5-hour window.
         if let previous = state.fiveHour, let current = agent.fiveHour,
            Self.isReset(previous: previous, current: current, now: now) {
-            state.resetUntil = now.addingTimeInterval(resetDisplayDuration)
+            state.showsReset = true
             if previous.usedPercent >= 50 || state.wasLimited {
                 alerts.append(AIUsageAlert(kind: .reset, agent: agent.agent,
                                            title: "Limit reset",
@@ -168,6 +167,8 @@ final class AIUsageStatusEngine {
             }
         }
         if agent.fiveHour != nil { state.fiveHour = agent.fiveHour }
+        // The next message opened a new window.
+        if let resetsAt = agent.fiveHour?.resetsAt, resetsAt > now { state.showsReset = false }
 
         // Limit reached.
         if agent.isAtLimit, !state.wasLimited, let limiting = agent.limitingWindow {
@@ -185,7 +186,7 @@ final class AIUsageStatusEngine {
                                        subtitle: parts.isEmpty ? name : parts.joined(separator: " · ")))
         }
         state.wasLimited = agent.isAtLimit
-        if agent.isAtLimit { state.resetUntil = nil }
+        if agent.isAtLimit { state.showsReset = false }
 
         // Usage warnings at the threshold and at 95%.
         let percent = agent.fiveHour?.usedPercent ?? 0
@@ -209,7 +210,7 @@ final class AIUsageStatusEngine {
                                            subtitle: "\(Self.sourceLabel(agent.agent, agent.workingSources)) · \(AIUsageFormat.percent(percent)) of 5-hour limit"))
             }
             state.idleSince = nil
-            state.resetUntil = nil
+            state.showsReset = false
         } else if state.wasWorking || state.idleSince == nil {
             state.idleSince = now
         }

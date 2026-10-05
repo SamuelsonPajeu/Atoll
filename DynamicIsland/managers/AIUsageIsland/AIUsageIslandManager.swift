@@ -357,7 +357,7 @@ actor AIUsageCollector {
             claude.plan = claudePlan
             claude.history = claudeDays
             if let quota = claudeQuota {
-                claude.fiveHour = quota.session.map { Self.window($0, duration: 5 * 3600) }?.rolledForward(now: now)
+                claude.fiveHour = quota.session.map { Self.window($0, duration: 5 * 3600) }?.rolledForward(now: now, restartsOnUse: true)
                 claude.weekly = quota.week.map { Self.window($0, duration: 7 * 86400) }?.rolledForward(now: now)
             } else if claudeAttemptAt != nil {
                 claude.problem = "Open Claude Code once to see your limits"
@@ -378,10 +378,10 @@ actor AIUsageCollector {
             let log = codexSummary?.latestQuota
             // Whichever observation is newer: the live endpoint or the CLI's own log.
             if let live = codexQuota, live.at >= (log?.observedAt ?? .distantPast) {
-                codex.fiveHour = live.session.map { Self.window($0, duration: 5 * 3600) }?.rolledForward(now: now)
+                codex.fiveHour = live.session.map { Self.window($0, duration: 5 * 3600) }?.rolledForward(now: now, restartsOnUse: true)
                 codex.weekly = live.week.map { Self.window($0, duration: 7 * 86400) }?.rolledForward(now: now)
             } else if let log {
-                codex.fiveHour = log.fiveHour?.rolledForward(now: now)
+                codex.fiveHour = log.fiveHour?.rolledForward(now: now, restartsOnUse: true)
                 codex.weekly = log.weekly?.rolledForward(now: now)
             }
             codex.plan = log?.plan ?? AIUsageCodexLogs.planFromAuth()

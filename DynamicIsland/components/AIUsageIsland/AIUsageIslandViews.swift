@@ -145,6 +145,8 @@ struct AIUsageCompactRow: View {
     }
 
     private func remaining(_ now: Date) -> String {
+        // No 5-hour window running: the clock starts with the next message.
+        if let fiveHour = focus.fiveHour, fiveHour.resetsAt == nil { return "5h 00m" }
         guard let resetsAt = focus.fiveHour?.resetsAt ?? focus.weekly?.resetsAt else { return "5h 00m" }
         return AIUsageFormat.duration(resetsAt.timeIntervalSince(now))
     }
